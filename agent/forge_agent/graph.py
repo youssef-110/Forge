@@ -106,7 +106,7 @@ def build_graph(model: BaseChatModel, tools: list[BaseTool], max_steps: int = MA
 
 def load_model(name: str | None = None) -> BaseChatModel:
     from langchain.chat_models import init_chat_model
-    return init_chat_model(name or os.getenv("MODEL", DEFAULT_MODEL), temperature=0)
+    return init_chat_model(name or os.getenv("MODEL") or DEFAULT_MODEL, temperature=0)
 
 
 def callbacks() -> list[Any]:

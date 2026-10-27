@@ -29,37 +29,97 @@ measures how well the agent does that.
 | [`agent/`](agent) | LangGraph, MCP, LLM-as-judge | Tool-calling agent, role-based guardrails, prompt-injection guard, a 40-case golden dataset, a scorer, and score history over time |
 | [`deploy/cloudrun/`](deploy/cloudrun) | Google Cloud Run, Upstash Redis | Free-tier deploy with keyless GitHub to GCP auth (Workload Identity Federation) |
 
-## Run it
+## Quick start
+
+Needs Docker Desktop. Go 1.26+ and Python 3.12+ are only needed for the local test and agent steps.
+
+### 1. Add your API key
 
 ```bash
-docker compose up -d --build            # ~3 min first time
-cd queue && go run ./cmd/loadgen -rate 20 -duration 1m
+cp .env.example .env
 ```
 
-- Queue API: http://localhost:8080
-- Grafana: http://localhost:3000 (dashboard "Forge job queue")
-- Jaeger: http://localhost:16686
-- Prometheus: http://localhost:9091
-- Search API: http://localhost:8090 (demo keys are listed in [docs/CONTRACTS.md](docs/CONTRACTS.md))
-- MCP server: http://localhost:8000/mcp
+Open `.env` and set `GROQ_API_KEY=` to a free key from https://console.groq.com/keys.
+Docker Compose and the agent CLI both read this file, and git ignores it.
+Only the agent and the evals need the key. The queue, search and dashboards run without it.
+
+### 2. Run the stack
+
+```bash
+docker compose up -d --build      # ~3-5 min the first time
+docker compose ps                 # everything "running"; search-seed "exited (0)"
+```
+
+| URL | What |
+|---|---|
+| http://localhost:8080 | Queue API |
+| http://localhost:3000 | Grafana, dashboard "Forge job queue" |
+| http://localhost:16686 | Jaeger traces (services `forge-api`, `forge-worker`) |
+| http://localhost:9091 | Prometheus (Status > Targets, Alerts) |
+| http://localhost:8090 | Search API (demo keys in [docs/CONTRACTS.md](docs/CONTRACTS.md)) |
+| http://localhost:8000/mcp | MCP server |
+
+### 3. Try it by hand
 
 ```bash
 curl -X POST localhost:8080/v1/jobs -d '{"type":"synthgen","payload":{"rows":50000,"seed":1},"priority":8}'
-curl localhost:8080/v1/jobs/<id>
-curl "localhost:8080/v1/jobs?state=dead"
+curl localhost:8080/v1/jobs/<id>                 # state goes queued -> running -> succeeded
+curl -X POST localhost:8080/v1/jobs -d '{"type":"flaky","payload":{"fail_rate":1}}'
+curl "localhost:8080/v1/jobs?state=dead"         # after 3 attempts with backoff it lands here
+curl localhost:8080/v1/stats
 curl -H "X-API-Key: demo-viewer-key" "localhost:8090/v1/search?q=retry+backoff&mode=hybrid"
 ```
 
-Kubernetes (needs kind, helm, kubectl): `bash deploy/kind/up.sh` creates a 3-node cluster, installs the chart and runs a smoke test.
-
-Agent and evals (needs an LLM key; Groq's free tier works):
+Generate load and watch the Grafana dashboard move:
 
 ```bash
-cd agent && python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"   # bin/ on Linux/macOS
-export GROQ_API_KEY=...
-python -m forge_agent.chat --key demo-operator-key "Run a synthgen job with 20000 rows, seed 4, then tell me its p95"
-python -m evals.run_evals && python -m evals.report     # appends to evals/history.jsonl, writes evals/REPORT.md
+cd queue && go run ./cmd/loadgen -rate 20 -duration 1m
 ```
+
+### 4. Talk to the agent
+
+```bash
+cd agent
+python -m venv .venv
+.venv/Scripts/pip install -e ".[dev]"            # Windows; use .venv/bin/pip on Linux/macOS
+.venv/Scripts/python -m forge_agent.chat --key demo-operator-key "Run a synthgen job with 20000 rows, seed 4, then tell me its p95"
+.venv/Scripts/python -m forge_agent.chat --key demo-viewer-key "Cancel every dead job"   # should be refused: viewers are read-only
+```
+
+### 5. Run the agent evals
+
+The evals score the agent on 40 golden cases. Each run appends a summary row to
+`agent/evals/history.jsonl`, and `report` writes `agent/evals/REPORT.md` with the trend over time.
+
+```bash
+cd agent
+.venv/Scripts/python -m evals.run_evals --concurrency 2       # add --no-judge to skip LLM-as-judge
+.venv/Scripts/python -m evals.report
+```
+
+You can also run them inside Docker:
+`docker compose run --rm --entrypoint python agent -m evals.run_evals --concurrency 2`.
+Groq's free tier is rate limited, so keep concurrency low.
+
+### 6. Run the tests (no services or keys needed)
+
+```bash
+cd queue  && go test ./...                                  # heap, quickselect, backoff, API+scheduler+worker e2e on in-memory Redis
+cd search && pip install -r requirements-dev.txt && pytest -q
+cd agent  && .venv/Scripts/python -m pytest -q
+```
+
+### 7. Kubernetes
+
+Needs kind, helm and kubectl. The script creates a 3-node cluster, installs the chart
+(2 API + 2 worker replicas) and runs a smoke-test job:
+
+```bash
+bash deploy/kind/up.sh
+kind delete cluster --name forge                            # clean up
+```
+
+Stop the compose stack with `docker compose down` (add `-v` to wipe its data).
 
 ## Design notes
 

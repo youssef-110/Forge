@@ -53,8 +53,8 @@ async def main() -> None:
     a = p.parse_args()
 
     cases = [c for c in load_cases(a.golden) if not a.category or c["category"] == a.category][: a.limit]
-    model_name = os.getenv("MODEL", DEFAULT_MODEL)
-    judge_name = None if a.no_judge else os.getenv("JUDGE_MODEL", model_name)
+    model_name = os.getenv("MODEL") or DEFAULT_MODEL
+    judge_name = None if a.no_judge else (os.getenv("JUDGE_MODEL") or model_name)
     model = load_model(model_name)
     judge = load_model(judge_name) if judge_name else None
     sem = asyncio.Semaphore(a.concurrency)

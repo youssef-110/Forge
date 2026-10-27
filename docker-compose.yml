@@ -105,6 +105,10 @@ services:
       QUEUE_URL: http://queue-api:8080
       SEARCH_URL: http://search:8090
       FORGE_API_KEY: demo-operator-key
+      # from the repo-root .env
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      MODEL: ${MODEL:-groq:llama-3.3-70b-versatile}
+      JUDGE_MODEL: ${JUDGE_MODEL:-}
     ports: ["8000:8000"]
     volumes:
       - ./agent/evals:/app/evals
