@@ -1,0 +1,137 @@
+# Full local stack: queue + search + observability.
+#   docker compose up -d --build
+#   API http://localhost:8080  Search http://localhost:8090
+#   Grafana http://localhost:3000  Prometheus http://localhost:9091  Jaeger http://localhost:16686
+name: forge
+
+x-otel: &otel
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 20
+
+  queue-api:
+    build: ./queue
+    image: forge-queue:dev
+    command: ["api"]
+    environment:
+      <<: *otel
+      REDIS_URL: redis://redis:6379/0
+    ports: ["8080:8080"]
+    depends_on:
+      redis: { condition: service_healthy }
+
+  worker:
+    image: forge-queue:dev
+    command: ["worker"]
+    deploy:
+      replicas: 2
+    environment:
+      <<: *otel
+      REDIS_URL: redis://redis:6379/0
+      WORKER_CONCURRENCY: "4"
+    depends_on:
+      queue-api: { condition: service_started }
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ["9200:9200"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow || exit 1"]
+      interval: 5s
+      retries: 40
+
+  mongo:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 20
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: forge
+      MYSQL_USER: forge
+      MYSQL_PASSWORD: forge
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uforge", "-pforge"]
+      interval: 5s
+      retries: 30
+
+  search:
+    build:
+      context: .
+      dockerfile: search/Dockerfile
+    image: forge-search:dev
+    environment: &search-env
+      ES_URL: http://elasticsearch:9200
+      MONGO_URL: mongodb://mongo:27017
+      MYSQL_URL: mysql+pymysql://forge:forge@mysql:3306/forge
+    ports: ["8090:8090"]
+    depends_on:
+      search-seed: { condition: service_completed_successfully }
+
+  # One-shot: schema, demo users, index mapping, runbook corpus.
+  search-seed:
+    image: forge-search:dev
+    build:
+      context: .
+      dockerfile: search/Dockerfile
+    command: ["python", "seed.py"]
+    environment: *search-env
+    depends_on:
+      elasticsearch: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+      mysql: { condition: service_healthy }
+
+  # MCP server (streamable HTTP on :8000/mcp). Evals run from this image too:
+  #   docker compose run --rm --entrypoint python -e GROQ_API_KEY agent -m evals.run_evals
+  agent:
+    build: ./agent
+    image: forge-agent:dev
+    environment:
+      QUEUE_URL: http://queue-api:8080
+      SEARCH_URL: http://search:8090
+      FORGE_API_KEY: demo-operator-key
+    ports: ["8000:8000"]
+    volumes:
+      - ./agent/evals:/app/evals
+    depends_on:
+      queue-api: { condition: service_started }
+      search: { condition: service_started }
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ["9091:9090"]
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/forge-queue.json
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.64.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["16686:16686"]

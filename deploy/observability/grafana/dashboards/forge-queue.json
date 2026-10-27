@@ -1,0 +1,521 @@
+{
+  "uid": "forge-queue",
+  "title": "Forge job queue",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "tags": [
+    "forge"
+  ],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Queued",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(forge_jobs{state=\"queued\"})"
+        }
+      ],
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Running",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(forge_jobs{state=\"running\"})"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Retrying",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(forge_jobs{state=\"retrying\"})"
+        }
+      ],
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Dead-lettered",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(forge_jobs{state=\"dead\"})"
+        }
+      ],
+      "id": 4
+    },
+    {
+      "type": "stat",
+      "title": "Throughput",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(forge_jobs_finished_total{outcome=\"succeeded\"}[1m]))"
+        }
+      ],
+      "id": 5
+    },
+    {
+      "type": "stat",
+      "title": "Success ratio (5m)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(forge_jobs_finished_total{outcome=\"succeeded\"}[5m])) / clamp_min(sum(rate(forge_jobs_finished_total[5m])), 1e-9)"
+        }
+      ],
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Jobs by state",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (state) (forge_jobs)",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "id": 7
+    },
+    {
+      "type": "timeseries",
+      "title": "Attempt outcomes / s",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(forge_jobs_finished_total[1m]))",
+          "legendFormat": "{{outcome}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(forge_jobs_enqueued_total[1m]))",
+          "legendFormat": "enqueued"
+        }
+      ],
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "Job duration by type",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le, type) (rate(forge_job_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50 {{type}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, type) (rate(forge_job_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 {{type}}"
+        }
+      ],
+      "id": 9
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue wait (submit to first claim)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(forge_job_queue_wait_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(forge_job_queue_wait_seconds_bucket[5m])))",
+          "legendFormat": "p50"
+        }
+      ],
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "API latency p95 by route",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(forge_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "id": 11
+    },
+    {
+      "type": "timeseries",
+      "title": "Scheduler",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (heap) (forge_scheduler_heap_size)",
+          "legendFormat": "heap {{heap}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(forge_scheduler_leader)",
+          "legendFormat": "leaders (should be 1)"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(increase(forge_jobs_reaped_total[5m]))",
+          "legendFormat": "reaped (5m)"
+        }
+      ],
+      "id": 12
+    }
+  ]
+}

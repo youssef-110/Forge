@@ -1,0 +1,5 @@
+Forge is installed.
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-api 8080:80
+  curl -X POST localhost:8080/v1/jobs -d '{"type":"synthgen","payload":{"rows":5000,"seed":1}}'
+  curl localhost:8080/v1/stats

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  labels: {{- include "forge.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: forge-api, app.kubernetes.io/instance: {{ .Release.Name }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: forge-api, app.kubernetes.io/instance: {{ .Release.Name }} }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.api.port }}"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext: { runAsNonRoot: true }
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["api"]
+          envFrom: [{ configMapRef: { name: {{ .Release.Name }}-config } }]
+          env:
+            - { name: PORT, value: "{{ .Values.api.port }}" }
+          ports: [{ name: http, containerPort: {{ .Values.api.port }} }]
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api
+  labels: {{- include "forge.labels" . | nindent 4 }}
+spec:
+  selector: { app.kubernetes.io/name: forge-api, app.kubernetes.io/instance: {{ .Release.Name }} }
+  ports: [{ name: http, port: 80, targetPort: http }]

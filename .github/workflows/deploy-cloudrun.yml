@@ -1,0 +1,29 @@
+# Deploys the queue API (with in-process workers) to Google Cloud Run.
+# One-time setup: deploy/cloudrun/README.md. Run from the Actions tab.
+name: deploy-cloudrun
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # keyless auth to GCP through Workload Identity Federation
+
+env:
+  REGION: europe-west1
+  SERVICE: forge-queue
+  IMAGE: europe-west1-docker.pkg.dev/${{ vars.GCP_PROJECT }}/forge/forge-queue:${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+      - run: docker build -t "$IMAGE" queue && docker push "$IMAGE"
+      - run: bash deploy/cloudrun/deploy.sh "$IMAGE"

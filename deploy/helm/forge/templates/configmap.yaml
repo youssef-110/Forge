@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels: {{- include "forge.labels" . | nindent 4 }}
+data:
+  REDIS_URL: {{ include "forge.redisUrl" . | quote }}
+  VISIBILITY_TIMEOUT: {{ .Values.config.visibilityTimeout | quote }}
+  BACKOFF_BASE: {{ .Values.config.backoffBase | quote }}
+  BACKOFF_CAP: {{ .Values.config.backoffCap | quote }}
+  READY_TARGET: {{ .Values.config.readyTarget | quote }}
+  WORKER_CONCURRENCY: {{ .Values.worker.concurrency | quote }}
+  {{- with .Values.config.otlpEndpoint }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ . | quote }}
+  {{- end }}

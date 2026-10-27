@@ -1,0 +1,10 @@
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+# client major must match the server major (ES 8.x)
+elasticsearch>=8.15,<9
+pymongo>=4.8,<5
+SQLAlchemy>=2.0,<3
+pymysql>=1.1,<2
+# pymysql needs it for MySQL 8 caching_sha2_password auth
+cryptography>=42
+fastembed>=0.4,<1

@@ -1,0 +1,8 @@
+# BuildKit picks this up for `-f search/Dockerfile` (context = repo root)
+**
+!search/requirements.txt
+!search/app
+!search/seed.py
+!search/schema.sql
+!docs/runbooks
+**/__pycache__

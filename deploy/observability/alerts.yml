@@ -1,0 +1,22 @@
+groups:
+  - name: forge
+    rules:
+      - alert: ForgeDeadLetterSpike
+        expr: sum(increase(forge_jobs_finished_total{outcome="dead"}[15m])) > 25
+        labels: { severity: page }
+        annotations:
+          summary: More than 25 jobs dead-lettered in 15 minutes
+          runbook: docs/runbooks/dead-letter-jobs.md
+      - alert: ForgeNoSchedulerLeader
+        expr: sum(forge_scheduler_leader) == 0
+        for: 1m
+        labels: { severity: page }
+        annotations:
+          summary: No API replica holds the scheduler lease; jobs are not being dispatched or reaped
+      - alert: ForgeQueueBacklog
+        expr: max(forge_jobs{state="queued"}) > 1000
+        for: 10m
+        labels: { severity: warn }
+        annotations:
+          summary: Over 1000 queued jobs for 10 minutes; scale workers
+          runbook: docs/runbooks/scaling-workers-kubernetes.md

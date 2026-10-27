@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: forge
+    folder: Forge
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

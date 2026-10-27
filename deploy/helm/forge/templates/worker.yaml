@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+  labels: {{- include "forge.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.worker.autoscaling.enabled }}
+  replicas: {{ .Values.worker.replicas }}
+  {{- end }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: forge-worker, app.kubernetes.io/instance: {{ .Release.Name }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: forge-worker, app.kubernetes.io/instance: {{ .Release.Name }} }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.worker.metricsPort }}"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      # On SIGTERM a worker stops claiming and marks in-flight jobs failed so they retry
+      # on another pod right away instead of waiting for the visibility-timeout reaper.
+      terminationGracePeriodSeconds: 40
+      securityContext: { runAsNonRoot: true }
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["worker"]
+          envFrom: [{ configMapRef: { name: {{ .Release.Name }}-config } }]
+          env:
+            - { name: METRICS_PORT, value: "{{ .Values.worker.metricsPort }}" }
+          ports: [{ name: metrics, containerPort: {{ .Values.worker.metricsPort }} }]
+          livenessProbe:
+            httpGet: { path: /healthz, port: metrics }
+            periodSeconds: 10
+          resources: {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-worker
+  labels: {{- include "forge.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: forge-worker, app.kubernetes.io/instance: {{ .Release.Name }} }
+{{- if .Values.worker.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Release.Name }}-worker
+  labels: {{- include "forge.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ .Release.Name }}-worker }
+  minReplicas: {{ .Values.worker.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.worker.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ .Values.worker.autoscaling.targetCPUUtilizationPercentage }} }
+{{- end }}

@@ -1,0 +1,13 @@
+rule_files: ["/etc/prometheus/alerts.yml"]
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: forge-api
+    static_configs:
+      - targets: ["queue-api:8080"]
+  - job_name: forge-worker
+    # one target per worker replica, found through Docker's DNS
+    dns_sd_configs:
+      - names: ["worker"]
+        type: A
+        port: 9090
